@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Record Video</title>
+</head>
+<body>
+    <h1>Record Video</h1>
+    <video id="video" width="640" height="480" autoplay></video>
+    <button id="start">Start Recording</button>
+    <button id="stop" disabled>Stop Recording</button>
+    <form id="video-form" enctype="multipart/form-data" style="display:none;">
+        <input type="file" id="video-file" name="video" accept="video/*">
+        <button type="submit">Upload Video</button>
+    </form>
+    <script>
+        const video = document.getElementById('video');
+        const startButton = document.getElementById('start');
+        const stopButton = document.getElementById('stop');
+        const videoInput = document.getElementById('video-file');
+        const videoForm = document.getElementById('video-form');
+
+        let mediaRecorder;
+        let recordedBlobs = [];
+
+        // Get access to the camera and microphone
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                video.srcObject = stream;
+
+                startButton.addEventListener('click', () => {
+                    recordedBlobs = [];
+                    mediaRecorder = new MediaRecorder(stream);
+
+                    mediaRecorder.ondataavailable = event => {
+                        if (event.data.size > 0) {
+                            recordedBlobs.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(recordedBlobs, { type: 'video/webm' });
+                        const file = new File([blob], 'video.webm', { type: 'video/webm' });
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        videoInput.files = dataTransfer.files;
+                        videoForm.style.display = 'block';
+                    };
+
+                    mediaRecorder.start();
+                    startButton.disabled = true;
+                    stopButton.disabled = false;
+                });
+
+                stopButton.addEventListener('click', () => {
+                    mediaRecorder.stop();
+                    startButton.disabled = false;
+                    stopButton.disabled = true;
+                });
+            })
+            .catch(err => {
+                console.error('Error accessing camera and microphone:', err);
+            });
+
+        // Handle form submission
+        videoForm.addEventListener('submit', event => {
+            event.preventDefault();
+            const formData = new FormData(videoForm);
+            fetch('/mediafiles/upload_video/', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+    </script>
+</body>
+</html>
